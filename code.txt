@@ -1,0 +1,55 @@
+!pip install -q transformers gradio sentencepiece
+import gradio as gr
+from transformers import MarianMTModel, MarianTokenizer
+
+# Supported languages and codes
+lang_dict = {
+    "English": "en",
+    "French": "fr",
+    "German": "de",
+    "Spanish": "es",
+    "Hindi": "hi",
+    "Arabic": "ar",
+    "Japanese": "ja"
+}
+
+# Translation logic
+def translate(text, source, targets):
+    src_code = lang_dict[source]
+    output = ""
+
+    for target in targets:
+        tgt_code = lang_dict[target]
+        if src_code == tgt_code:
+            output += f"{target}: {text}\n\n"
+            continue
+
+        model_name = f"Helsinki-NLP/opus-mt-{src_code}-{tgt_code}"
+        try:
+            tokenizer = MarianTokenizer.from_pretrained(model_name)
+            model = MarianMTModel.from_pretrained(model_name)
+
+            tokens = tokenizer(text, return_tensors="pt", padding=True)
+            translation = model.generate(**tokens)
+            translated = tokenizer.decode(translation[0], skip_special_tokens=True)
+
+            output += f"{target}: {translated}\n\n"
+        except:
+            output += f"{target}: ❌ Model not available\n\n"
+
+    return output.strip()
+
+# Gradio UI
+demo = gr.Interface(
+    fn=translate,
+    inputs=[
+        gr.Textbox(label="Enter Text", lines=3),
+        gr.Dropdown(choices=list(lang_dict.keys()), label="Source Language", value="English"),
+        gr.CheckboxGroup(choices=list(lang_dict.keys()), label="Target Languages")
+    ],
+    outputs=gr.Textbox(label="Translations", lines=10),
+    title="🌍 Multi-language Translator",
+    description="Translate text into multiple languages using Hugging Face models."
+)
+
+demo.launch(share=True)
